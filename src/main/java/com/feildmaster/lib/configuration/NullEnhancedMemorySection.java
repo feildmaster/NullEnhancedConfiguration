@@ -1,32 +1,34 @@
 package com.feildmaster.lib.configuration;
 
-import java.util.regex.Pattern;
+import org.apache.commons.lang.Validate;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.MemorySection;
 
-public class NullEnhancedMemorySection extends EnhancedMemorySection {
+public class NullEnhancedMemorySection extends EnhancedMemorySection implements NullConfigurationSection {
     public NullEnhancedMemorySection(EnhancedConfiguration superParent, MemorySection parent, String path) {
         super(superParent, parent, path);
     }
 
+    @Override
     public void set(String path, Object value) {
-        if (path.length() == 0) {
-            throw new IllegalArgumentException("Cannot set to an empty path");
-        }
+       Validate.notEmpty(path, "Cannot set to an empty path");
 
-        String[] split = path.split(Pattern.quote(Character.toString(getRoot().options().pathSeparator())));
-        NullEnhancedMemorySection section = this;
-
-        for (int i = 0; i < split.length - 1; i++) {
-            NullEnhancedMemorySection last = section;
-
-            section = last.getConfigurationSection(split[i]);
-
-            if (section == null) {
-                section = last.createSection(split[i]);
+        final char seperator = getRoot().options().pathSeparator();
+        // i1 is the leading (higher) index
+        // i2 is the trailing (lower) index
+        int i1 = -1, i2;
+        ConfigurationSection section = this;
+        while ((i1 = path.indexOf(seperator, i2 = i1 + 1)) != -1) {
+            String node = path.substring(i2, i1);
+            ConfigurationSection subSection = section.getConfigurationSection(node);
+            if (subSection == null) {
+                section = section.createSection(node);
+            } else {
+                section = subSection;
             }
         }
 
-        String key = split[split.length - 1];
+        String key = path.substring(i2);
         if (section == this) {
             this.map.put(key, value);
         } else {
@@ -39,67 +41,73 @@ public class NullEnhancedMemorySection extends EnhancedMemorySection {
      *
      * @param path The path to remove
      */
+    @Override
     public void unset(String path) {
-        String[] split = path.split(Pattern.quote(Character.toString(getRoot().options().pathSeparator())));
-        NullEnhancedMemorySection section = getConfigurationSection(path);
+        Validate.notEmpty(path, "Cannot set to an empty path");
 
-        if (section != null) {
-            String key = split[split.length-1];
-            section.remove(key);
+        final char seperator = getRoot().options().pathSeparator();
+        // i1 is the leading (higher) index
+        // i2 is the trailing (lower) index
+        int i1 = -1, i2;
+        NullConfigurationSection section = this;
+        while ((i1 = path.indexOf(seperator, i2 = i1 + 1)) != -1) {
+            String node = path.substring(i2, i1);
+            NullConfigurationSection subSection = section.getConfigurationSection(node);
+            if (subSection == null) {
+                section = section.createSection(node);
+            } else {
+                section = subSection;
+            }
+        }
+
+        String key = path.substring(i2);
+        if (section == this) {
+            remove(key);
+        } else {
+            section.unset(key);
         }
     }
 
-    protected void remove(String key) {
+    private void remove(String key) {
         this.map.remove(key);
     }
 
     @Override
-    public NullEnhancedMemorySection getConfigurationSection(String path) { // Sections are exact paths now!
-        if (path == null) {
-            throw new IllegalArgumentException("Path cannot be null");
-        }
-
-        NullEnhancedMemorySection section = (NullEnhancedMemorySection) super.getConfigurationSection(path);
-        if (section == null) {
-            section = createSection(path);
-        }
-
-        return section;
+    public NullConfigurationSection getConfigurationSection(String path) {
+        return (NullConfigurationSection) super.getConfigurationSection(path);
     }
 
     @Override
-    public NullEnhancedMemorySection createSection(String path) {
-        if (path == null) {
-            throw new IllegalArgumentException("Path cannot be null");
-        } else if (path.length() == 0) {
-            throw new IllegalArgumentException("Cannot create section at empty path");
-        }
+    public NullConfigurationSection createSection(String path) {
+        Validate.notNull(path, "Path cannot be null");
+        Validate.notEmpty(path, "Cannot create section at empty path");
 
-        String[] split = path.split(Pattern.quote(Character.toString(getRoot().options().pathSeparator())));
-        NullEnhancedMemorySection section = this;
-
-        for (int i = 0; i < split.length - 1; i++) {
-            NullEnhancedMemorySection last = section;
-            if (section != null) {
-                section = getConfigurationSection(split[i]);
-            }
-
-            if (section == null) {
-                if (last == null) {
-                    section = createLiteralSection(split[i]);
-                } else {
-                    section = last.createLiteralSection(split[i]);
-                }
+        final char seperator = getRoot().options().pathSeparator();
+        // i1 is the leading (higher) index
+        // i2 is the trailing (lower) index
+        int i1 = -1, i2;
+        NullConfigurationSection section = this;
+        while ((i1 = path.indexOf(seperator, i2 = i1 + 1)) != -1) {
+            String node = path.substring(i2, i1);
+            NullConfigurationSection subSection = section.getConfigurationSection(node);
+            if (subSection == null) {
+                section = section.createLiteralSection(node);
+            } else {
+                section = subSection;
             }
         }
 
-        String key = split[split.length - 1];
+        String key = path.substring(i2);
+        if (section == this) {
+            return createLiteralSection(key);
+        }
         return section.createLiteralSection(key);
     }
 
-    public NullEnhancedMemorySection createLiteralSection(String key) {
-        NullEnhancedMemorySection newSection = new NullEnhancedMemorySection(superParent, this, key);
-        map.put(key, newSection);
-        return newSection;
+    @Override
+    public NullConfigurationSection createLiteralSection(String key) {
+        NullConfigurationSection section = new NullEnhancedMemorySection(superParent, this, key);
+        map.put(key, section);
+        return section;
     }
 }
