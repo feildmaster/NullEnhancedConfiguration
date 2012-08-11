@@ -11,7 +11,12 @@ public class NullEnhancedMemorySection extends EnhancedMemorySection implements 
 
     @Override
     public void set(String path, Object value) {
-       Validate.notEmpty(path, "Cannot set to an empty path");
+        Validate.notNull(path, "Path cannot be null");
+        Validate.notEmpty(path, "Cannot set to an empty path");
+
+        if (!value.equals(get(path))) {
+            superParent.modified = true;
+        }
 
         final char seperator = getRoot().options().pathSeparator();
         // i1 is the leading (higher) index
@@ -36,6 +41,25 @@ public class NullEnhancedMemorySection extends EnhancedMemorySection implements 
         }
     }
 
+    @Override
+    public Object get(String path, Object def) {
+        Validate.notNull(path, "Path cannot be null");
+        if (path.isEmpty()) {
+            return this;
+        }
+
+        if (superParent.cache.containsKey(path)) {
+            return superParent.cache.get(path);
+        }
+
+        Object value = super.get(path, def);
+        if (!(value instanceof ConfigurationSection)) {
+            superParent.cache.put(path, value);
+        }
+
+        return value;
+    }
+
     /**
      * Removes the specified path from the configuration.
      *
@@ -43,7 +67,12 @@ public class NullEnhancedMemorySection extends EnhancedMemorySection implements 
      */
     @Override
     public void unset(String path) {
+        Validate.notNull(path, "Path cannot be null");
         Validate.notEmpty(path, "Cannot set to an empty path");
+
+        // We're removing something... so it's (probably) modified
+        superParent.modified = true;
+        superParent.cache.remove(path);
 
         final char seperator = getRoot().options().pathSeparator();
         // i1 is the leading (higher) index
@@ -62,14 +91,10 @@ public class NullEnhancedMemorySection extends EnhancedMemorySection implements 
 
         String key = path.substring(i2);
         if (section == this) {
-            remove(key);
+            map.remove(key);
         } else {
             section.unset(key);
         }
-    }
-
-    private void remove(String key) {
-        this.map.remove(key);
     }
 
     @Override
@@ -81,6 +106,9 @@ public class NullEnhancedMemorySection extends EnhancedMemorySection implements 
     public NullConfigurationSection createSection(String path) {
         Validate.notNull(path, "Path cannot be null");
         Validate.notEmpty(path, "Cannot create section at empty path");
+
+        // We're creating sections... This means it's modified!
+        superParent.modified = true;
 
         final char seperator = getRoot().options().pathSeparator();
         // i1 is the leading (higher) index

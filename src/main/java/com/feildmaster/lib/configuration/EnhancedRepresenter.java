@@ -10,7 +10,7 @@ public class EnhancedRepresenter extends YamlRepresenter {
         this.nullRepresenter = new NullRepresenter();
     }
 
-    private class NullRepresenter implements Represent {
+    class NullRepresenter implements Represent {
         @Override
         public Node representData(Object data) {
             return representScalar(Tag.NULL, "");

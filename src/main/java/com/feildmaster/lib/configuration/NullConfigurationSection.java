@@ -1,9 +1,5 @@
 package com.feildmaster.lib.configuration;
 
-/**
- *
- * @author feildmaster
- */
 public interface NullConfigurationSection extends EnhancedConfigurationSection {
     NullConfigurationSection getConfigurationSection(String path);
 

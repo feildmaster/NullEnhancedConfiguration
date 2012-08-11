@@ -15,25 +15,49 @@ import org.yaml.snakeyaml.*;
  * @author Feildmaster
  */
 public class NullEnhancedConfiguration extends EnhancedConfiguration implements NullConfigurationSection {
+    /**
+     * Creates a new NullEnhancedConfiguration with a file named "config.yml," stored in the plugin DataFolder
+     * <p />
+     * Will fail if plugin is null
+     *
+     * @param plugin The plugin registered to this Configuration
+     */
     public NullEnhancedConfiguration(Plugin plugin) {
         this("config.yml", plugin);
     }
 
+    /**
+     * Creates a new NullEnhancedConfiguration with a file stored in the plugin DataFolder
+     * <p />
+     * Will fail if plugin is null.
+     *
+     * @param file The name of the file
+     * @param plugin The plugin registered to this Configuration
+     */
     public NullEnhancedConfiguration(String file, Plugin plugin) {
-        super(file, plugin, false);
-
-        reflectYaml();
+        this(new File(plugin.getDataFolder(), file), plugin);
     }
 
+    /**
+     * Creates a new NullEnhancedConfiguration with given File and Plugin.
+     *
+     * @param file The file to store in this Configuration
+     * @param plugin The plugin registered to this Configuration
+     */
     public NullEnhancedConfiguration(File file, Plugin plugin) {
         super(file, plugin, false);
-
         reflectYaml();
+        load();
     }
 
     @Override
     public void set(String path, Object value) {
+        Validate.notNull(path, "Path cannot be null");
         Validate.notEmpty(path, "Cannot set to an empty path");
+
+        if (!value.equals(get(path))) {
+            modified = true;
+        }
 
         final char seperator = getRoot().options().pathSeparator();
         // i1 is the leading (higher) index
@@ -52,19 +76,45 @@ public class NullEnhancedConfiguration extends EnhancedConfiguration implements 
 
         String key = path.substring(i2);
         if (section == this) {
-            this.map.put(key, value);
+            map.put(key, value);
         } else {
             section.set(key, value);
         }
     }
 
+    @Override
+    public Object get(String path, Object def) {
+        Validate.notNull(path, "Path cannot be null");
+        if (path.isEmpty()) {
+            return this;
+        }
+
+        if (cache.containsKey(path)) {
+            return cache.get(path);
+        }
+
+        Object value = super.get(path, def);
+        if (!(value instanceof ConfigurationSection)) {
+            cache.put(path, value);
+        }
+
+        return value;
+    }
+
     /**
-     * Removes the specified path from the configuration.
+     * Removes the specified path from the configuration
      *
      * @param path The path to remove
      */
     @Override
     public void unset(String path) {
+        Validate.notNull(path, "Path cannot be null");
+        Validate.notEmpty(path, "Cannot set to an empty path");
+
+        // We're removing something... so it's (probably) modified
+        modified = true;
+        cache.remove(path);
+
         final char seperator = getRoot().options().pathSeparator();
         // i1 is the leading (higher) index
         // i2 is the trailing (lower) index
@@ -82,16 +132,11 @@ public class NullEnhancedConfiguration extends EnhancedConfiguration implements 
 
         String key = path.substring(i2);
         if (section == this) {
-            remove(key);
+            map.remove(key);
         } else {
             section.unset(key);
         }
     }
-
-    private void remove(String key) {
-        map.remove(key);
-    }
-
 
     @Override
     public NullConfigurationSection getConfigurationSection(String path) {
@@ -102,6 +147,9 @@ public class NullEnhancedConfiguration extends EnhancedConfiguration implements 
     public NullConfigurationSection createSection(String path) {
         Validate.notNull(path, "Path cannot be null");
         Validate.notEmpty(path, "Cannot create section at empty path");
+
+        // We're creating sections... This means it's modified!
+        modified = true;
 
         final char seperator = getRoot().options().pathSeparator();
         // i1 is the leading (higher) index
@@ -119,9 +167,6 @@ public class NullEnhancedConfiguration extends EnhancedConfiguration implements 
         }
 
         String key = path.substring(i2);
-        if (section == this) {
-            return createLiteralSection(key);
-        }
         return section.createLiteralSection(key);
     }
 
@@ -140,20 +185,23 @@ public class NullEnhancedConfiguration extends EnhancedConfiguration implements 
             }
 
             // Set the representer
+            EnhancedRepresenter newRepresenter = new EnhancedRepresenter();
             Field representer = yamlClass.getDeclaredField("yamlRepresenter");
             representer.setAccessible(true);
-            representer.set(this, new EnhancedRepresenter());
-            // Get the options
+            representer.set(this, newRepresenter);
+
+            // Get the options, and reuse them! :D
             Field options = yamlClass.getDeclaredField("yamlOptions");
             options.setAccessible(true);
-            // Set the yaml
+            DumperOptions oldOptions = (DumperOptions) options.get(this);
+
+            // Set the yaml, too bad I can't just set my representer on the old instance. :(
+            Yaml newYaml = new Yaml(new YamlConstructor(), newRepresenter, oldOptions);
             Field yaml = yamlClass.getDeclaredField("yaml");
             yaml.setAccessible(true);
-            yaml.set(this, new Yaml(new YamlConstructor(), (EnhancedRepresenter) representer.get(this), (DumperOptions) options.get(this)));
+            yaml.set(this, newYaml);
         } catch (Exception ex) {
-            getPlugin().getLogger().log(java.util.logging.Level.SEVERE, null, ex);
+            getPlugin().getLogger().log(java.util.logging.Level.SEVERE, "Sorry, something bad happened with setting up NullEnhancedConfiguration. Here's an exception:", ex);
         }
-
-        load();
     }
 }
