@@ -16,6 +16,7 @@ public class NullEnhancedMemorySection extends EnhancedMemorySection implements 
 
         if ((value == null && get(path) != null) || (value != null && !value.equals(get(path)))) {
             superParent.modified = true;
+            superParent.cache.remove(getCurrentPath() + path);
         }
 
         final char seperator = getRoot().options().pathSeparator();
@@ -48,13 +49,15 @@ public class NullEnhancedMemorySection extends EnhancedMemorySection implements 
             return this;
         }
 
-        if (superParent.cache.containsKey(path)) {
-            return superParent.cache.get(path);
+        String fullPath = getCurrentPath() + path;
+
+        if (superParent.cache.containsKey(fullPath)) {
+            return superParent.cache.get(fullPath);
         }
 
         Object value = super.get(path, def);
         if (!(value instanceof ConfigurationSection)) {
-            superParent.cache.put(path, value);
+            superParent.cache.put(fullPath, value);
         }
 
         return value;
@@ -72,7 +75,7 @@ public class NullEnhancedMemorySection extends EnhancedMemorySection implements 
 
         // We're removing something... so it's (probably) modified
         superParent.modified = true;
-        superParent.cache.remove(path);
+        superParent.cache.remove(getCurrentPath() + path);
 
         final char seperator = getRoot().options().pathSeparator();
         // i1 is the leading (higher) index

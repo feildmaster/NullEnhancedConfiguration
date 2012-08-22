@@ -57,16 +57,17 @@ public class NullEnhancedConfiguration extends EnhancedConfiguration implements 
 
         if (!value.equals(get(path))) {
             modified = true;
+            cache.remove(path);
         }
 
         final char seperator = getRoot().options().pathSeparator();
         // i1 is the leading (higher) index
         // i2 is the trailing (lower) index
         int i1 = -1, i2;
-        ConfigurationSection section = this;
+        NullConfigurationSection section = this;
         while ((i1 = path.indexOf(seperator, i2 = i1 + 1)) != -1) {
             String node = path.substring(i2, i1);
-            ConfigurationSection subSection = section.getConfigurationSection(node);
+            NullConfigurationSection subSection = section.getConfigurationSection(node);
             if (subSection == null) {
                 section = section.createSection(node);
             } else {
