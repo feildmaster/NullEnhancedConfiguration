@@ -14,7 +14,7 @@ public class NullEnhancedMemorySection extends EnhancedMemorySection implements 
         Validate.notNull(path, "Path cannot be null");
         Validate.notEmpty(path, "Cannot set to an empty path");
 
-        if ((value == null && get(path) != null) || !value.equals(get(path))) {
+        if ((value == null && get(path) != null) || (value != null && !value.equals(get(path)))) {
             superParent.modified = true;
         }
 
