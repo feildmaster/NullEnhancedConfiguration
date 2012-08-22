@@ -55,7 +55,7 @@ public class NullEnhancedConfiguration extends EnhancedConfiguration implements 
         Validate.notNull(path, "Path cannot be null");
         Validate.notEmpty(path, "Cannot set to an empty path");
 
-        if (!value.equals(get(path))) {
+        if ((value == null && get(path) != null) || (value != null && !value.equals(get(path)))) {
             modified = true;
             cache.remove(path);
         }
